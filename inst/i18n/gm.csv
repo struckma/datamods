@@ -60,3 +60,5 @@ label,translation,comment
 "No data to display.","Keine Daten zum Anzeigen."
 "Close","Schließen"
 "Add a label to data","Bezeichnung zu Daten hinzufügen"
+"Please install.packages('opalr').","Bitte installieren Sie opalr."
+"opalr not installed, so not opalr import is offered, Please install.packages('opalr').","Opal kann nicht angeboten werden, wenn das Paket opalr nicht installiert ist."

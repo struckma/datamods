@@ -39,6 +39,7 @@ Imports:
     tibble,
     tools
 Suggests: 
+    opalr,
     jsonlite,
     knitr,
     MASS,

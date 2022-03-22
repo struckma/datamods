@@ -19,7 +19,7 @@
 #'
 #' @example examples/modal.R
 #'
-import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "url")) {
+import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "url", "opalr")) {
   ns <- NS(id)
   from <- match.arg(from, several.ok = TRUE)
 
@@ -63,6 +63,23 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
     )
   }
 
+  if (requireNamespace("opalr", quietly = TRUE)) {
+    opalr <- if ("opalr" %in% from) {
+      tabPanelBody(
+        value = "opalr",
+        tags$br(),
+        import_opalr_ui(id = ns("opalr"), title = NULL)
+      )
+    }
+  } else if ("opalr" %in% from) {
+    from <- setdiff(from, "opalr")
+    if (length(from) == 0) {
+      stop(i18n("Please install.packages('opalr')."))
+    } else {
+      warning(i18n("opalr not installed, so not opalr import is offered, Please install.packages('opalr')."))
+    }
+  }
+
   #database <- if("database" %in% from) tabPanel("Database", import_database_ui(ns("database")))
 
   labsImport <- list(
@@ -70,6 +87,7 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
     "file" = i18n("External file"),
     "copypaste" = i18n("Copy / Paste"),
     "googlesheets" = i18n("Googlesheets"),
+    "opalr" = i18n("opalr"),
     "url" = i18n("URL")
   )
   iconsImport <- list(
@@ -77,6 +95,7 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
     "file" = phosphoricons::ph("file-arrow-down", title = labsImport$file),
     "copypaste" = phosphoricons::ph("clipboard-text", title = labsImport$copypaste),
     "googlesheets" = phosphoricons::ph("cloud-arrow-down", title = labsImport$googlesheets),
+    "opalr" = phosphoricons::ph("database", title = labsImport$opalr),
     "url" = phosphoricons::ph("link", title = labsImport$url)
   )
 
@@ -88,11 +107,12 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
       "file" = import_file_ui(id = ns("file")),
       "copypaste" = import_copypaste_ui(id = ns("copypaste")),
       "googlesheets" = import_googlesheets_ui(id = ns("googlesheets")),
+      "opalr" = import_opalr_ui(id = ns("opalr")),
       "url" = import_url_ui(id = ns("url")),
     )
   } else {
     tabsetPanelArgs <- dropNulls(list(
-      env, file, copypaste, googlesheets, url,
+      env, file, copypaste, googlesheets, opalr, url,
       id = ns("tabs-import"),
       type = "hidden"
     ))
@@ -259,6 +279,12 @@ import_server <- function(id,
         btn_show_data = FALSE,
         reset = reactive(input$hidden)
       )
+      from_opalr <- import_opalr_server(
+        id = "opalr",
+        trigger_return = "change",
+        btn_show_data = FALSE,
+        reset = reactive(input$hidden)
+      )
       from_url <- import_url_server(
         id = "url",
         trigger_return = "change",
@@ -282,6 +308,10 @@ import_server <- function(id,
       observeEvent(from_googlesheets$data(), {
         data_rv$data <- from_googlesheets$data()
         data_rv$name <- from_googlesheets$name()
+      })
+      observeEvent(from_opalr$data(), {
+        data_rv$data <- from_opalr$data()
+        data_rv$name <- from_opalr$name()
       })
       observeEvent(from_url$data(), {
         data_rv$data <- from_url$data()
