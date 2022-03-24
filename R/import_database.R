@@ -34,6 +34,9 @@ import_database_ui <- function(id, title = TRUE) {
       label = i18n("Connect"),
       icon = phosphoricons::ph("arrows-clockwise")
     ),
+    dbConnectGUI::create_connect_dialog_UI(id,
+                                           displayCancel = FALSE,
+                                           submitLabel = "Connect..."),
     selectInput(
       inputId = ns("schema"),
       label = "Schema",
@@ -114,9 +117,8 @@ import_database_server <- function(id,
       }
     }
 
-    connect <- function() {
-      dbConnectGUI::connect_dialog()
-      o <- "TODO: Call connection dialog"
+    connect <- function(...) {
+      o <- ""
       if (inherits(o, "try-error")) { # https://opal-demo.obiba.org/
         toggle_widget(inputId = "confirm", enable = FALSE)
         insert_error(mssg = i18n(attr(o, "condition")$message))
@@ -193,6 +195,11 @@ import_database_server <- function(id,
     }
   }
 
+  dbConnectGUI::create_connect_dialog_SRV(id,
+                                          callback = function(...) {
+                                            browser() # TODO: https://stackoverflow.com/a/68594560
+                                            str(...)
+                                          })
   moduleServer(
     id = id,
     module = module
