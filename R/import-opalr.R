@@ -140,154 +140,6 @@ import_opalr_server <- function(id,
                           choices = choices)
       }
     }
-    
-    #' ensure that a column LABEL is there. OPAL provides label, but also localized ones such as label:de or label:en.
-    #'
-    #' @param df_labelled the data frame with label columns
-    #' @param preferred_locale the prefered locale, en by default
-    #'
-    #' @return df_labelled enriched by a valid label column
-    #' @author Jörg Henke
-    #' 
-    util_ensure_default_label <- function(df_labelled, preferred_locale = "en") {
-      cn <- colnames(df_labelled)
-      if ("label" %in% cn) {
-        # all is well, leave it as it is (other labels can become variable attributes)
-      } else {
-        localized_labels <- cn[grepl("label", cn)]
-        if (length(localized_labels) > 0) {
-          if (length(localized_labels) > 1) {
-            preferred_colname <- sprintf("label:%s", preferred_locale)
-            if (preferred_colname %in% localized_labels) {
-              df_labelled$label <- df_labelled[[preferred_colname]]
-              df_labelled[[preferred_colname]] <- NULL # we don't need that column any longer
-            } else {
-              df_labelled$label <- df_labelled[[localized_labels[[1]]]]
-              df_labelled[[localized_labels[1]]] <- NULL # we don't need that column any longer
-            }
-          } else {
-            df_labelled$label <- df_labelled[[localized_labels[1]]]
-            df_labelled[[localized_labels[1]]] <- NULL # we don't need that column any longer
-          }
-        } else {
-          df_labelled$label <- "OPAL did not provide a label column"
-          warning("OPAL did not provide a label column")
-        }
-      }
-      return(df_labelled)
-    }
-    
-    #' convert opal data types to dataquieR compatible ones
-    #' see also: https://gitlab.com/umg_hgw/sc/implementation/opalrepository/-/issues/1
-    #'
-    #' @param opal_datatypes the opal data types vector
-    #'
-    #' @return the same vector with dataquieR compatible data types
-    #' 
-    #' @author Jörg Henke
-    #' 
-    util_dataquieR_datatypes <- function(opal_datatypes) {
-      mapping <- c("integer" = "integer",
-                   "decimal" = "float",
-                   "text" = "string",
-                   "binary" = "integer",
-                   "locale" = "string",
-                   "boolean" = "integer",
-                   "datetime" = "datetime",
-                   "date" = "datetime",
-                   "point" = "string",
-                   "linestring" = "string",
-                   "polygon" = "string")
-      return(mapping[opal_datatypes])
-    }
-
-    #' prepare the categories dataframe to have one line for all variables
-    #'
-    #' @param df_categories the OPAL Categories data frame
-    #'
-    #' @return a data frame with OPAL Categories the dataquieR way
-    #' 
-    #' @author Adrian Richter
-    #' 
-    #' @importFrom data.table dcast
-    util_prepare_categories <- function(df_categories) {
-      xm <- dcast(setDT(df_categories), variable ~ name + label, fill = 0)
-      xm <- as.data.frame(apply(xm, 2, function(x) {
-        ifelse(x == 0, NA, x)
-      }))
-      vl <- gsub("_", " = ", names(xm))
-      nc <- ncol(xm)
-      for (i in 1:nrow(xm)) {
-        xm$VALUE_LABELS[i] <- paste0(vl[2:nc][!is.na(xm[i, 2:nc])], collapse = " | ")
-      }
-      xm <- xm[, c("variable", "VALUE_LABELS")]
-      names(xm) <- c("VAR_NAMES", "VALUE_LABELS")
-      return(xm)
-    }
-    
-    #' extract the missings from the values
-    #'
-    #' @param df_categories the OPAL categories sheet as a data frame
-    #' @param ordered_variables the variables in the correct order
-    #'
-    #' @return the full vector of missing lists ordered by the ordered_variables
-    #' @author Jörg Henke
-    #' 
-    #' @importFrom stats setNames
-    #' @importFrom data.table dcast setDT
-    util_extract_missinglist <- function(df_categories, ordered_variables) {
-      df_missing <- df_categories[df_categories$missing, c("variable", "name"), drop = FALSE]
-      if (nrow(df_missing) > 0) {
-        df_missing
-        
-        xm <- dcast(setDT(df_missing), variable ~ name, fill = 0)
-        
-        paste0withoutNA <- function(x) {
-          paste0(x[!is.na(x)], collapse = "|")
-        }
-        
-        merged <- setNames(apply(xm[, -1, drop = FALSE], 1, paste0withoutNA), nm = xm[, 1, drop = TRUE])
-        
-        return(merged[ordered_variables])
-      } else {
-        return(NA_character_)
-      }
-    }
-    
-    #' 
-    #' @author Jörg Henke
-    #' 
-    opal2dataquieR <- function(opal_input) {
-      
-      # install.packages("opalr")
-      # library(opalr)
-      # o <- opal.login('administrator','password', url='https://opal-demo.obiba.org')
-      # opal_input <- opal.table_dictionary_get(o, "CNSIM", "CNSIM1")
-      # opal.logout(o)
-      
-      df_variables <- opal_input$variables
-      df_categories <- opal_input$categories
-      
-      df_vars <- df_variables[!is.na(df_variables$index), , drop = FALSE]
-      df_vars <- util_ensure_default_label(df_vars)
-      df_categories <- util_ensure_default_label(df_categories)
-      df_vars <- rename(df_vars, c("index"       = "VARIABLE_ORDER",
-                                   "name"        = "VAR_NAMES",
-                                   "description" = "LONG_LABEL",
-                                   "label"       = "LABEL"))
-      df_vars$DATA_TYPE <- util_dataquieR_datatypes(df_vars$valueType)
-      df_vars$valueType <- NULL
-      
-      df_vars <- merge(df_vars, util_prepare_categories(df_categories = df_categories), 
-                       by = "VAR_NAMES",
-                       all.x = TRUE)
-      
-      df_vars$MISSING_LIST <- util_extract_missinglist(df_categories = df_categories, ordered_variables = df_vars$VAR_NAMES)
-      
-      attr(df_vars, "extra_cols") <- setdiff(names(df_vars), names(dataquieR::WELL_KNOWN_META_VARIABLE_NAMES))
-      attr(df_vars, "missing_cols") <- setdiff(names(dataquieR::WELL_KNOWN_META_VARIABLE_NAMES), names(df_vars))
-      return(df_vars)
-    }
 
     connect <- function() {
       req(input$url, input$username, input$password)
@@ -405,3 +257,153 @@ import_opalr_server <- function(id,
 
 # Utils -------------------------------------------------------------------
 
+#' ensure that a column LABEL is there. OPAL provides label, but also localized ones such as label:de or label:en.
+#'
+#' @param df_labelled the data frame with label columns
+#' @param preferred_locale the prefered locale, en by default
+#'
+#' @return df_labelled enriched by a valid label column
+#' @author Jörg Henke
+#'
+util_ensure_default_label <- function(df_labelled, preferred_locale = "en") {
+  cn <- colnames(df_labelled)
+  if ("label" %in% cn) {
+    # all is well, leave it as it is (other labels can become variable attributes)
+  } else {
+    localized_labels <- cn[grepl("label", cn)]
+    if (length(localized_labels) > 0) {
+      if (length(localized_labels) > 1) {
+        preferred_colname <- sprintf("label:%s", preferred_locale)
+        if (preferred_colname %in% localized_labels) {
+          df_labelled$label <- df_labelled[[preferred_colname]]
+          df_labelled[[preferred_colname]] <- NULL # we don't need that column any longer
+        } else {
+          df_labelled$label <- df_labelled[[localized_labels[[1]]]]
+          df_labelled[[localized_labels[1]]] <- NULL # we don't need that column any longer
+        }
+      } else {
+        df_labelled$label <- df_labelled[[localized_labels[1]]]
+        df_labelled[[localized_labels[1]]] <- NULL # we don't need that column any longer
+      }
+    } else {
+      df_labelled$label <- "OPAL did not provide a label column"
+      warning("OPAL did not provide a label column")
+    }
+  }
+  return(df_labelled)
+}
+
+#' convert opal data types to dataquieR compatible ones
+#' see also: https://gitlab.com/umg_hgw/sc/implementation/opalrepository/-/issues/1
+#'
+#' @param opal_datatypes the opal data types vector
+#'
+#' @return the same vector with dataquieR compatible data types
+#'
+#' @author Jörg Henke
+#'
+util_dataquieR_datatypes <- function(opal_datatypes) {
+  mapping <- c("integer" = "integer",
+               "decimal" = "float",
+               "text" = "string",
+               "binary" = "integer",
+               "locale" = "string",
+               "boolean" = "integer",
+               "datetime" = "datetime",
+               "date" = "datetime",
+               "point" = "string",
+               "linestring" = "string",
+               "polygon" = "string")
+  return(mapping[opal_datatypes])
+}
+
+#' prepare the categories dataframe to have one line for all variables
+#'
+#' @param df_categories the OPAL Categories data frame
+#'
+#' @return a data frame with OPAL Categories the dataquieR way
+#'
+#' @author Adrian Richter
+#'
+#' @importFrom data.table dcast
+util_prepare_categories <- function(df_categories) {
+  xm <- dcast(setDT(df_categories), variable ~ name + label, fill = 0)
+  xm <- as.data.frame(apply(xm, 2, function(x) {
+    ifelse(x == 0, NA, x)
+  }))
+  vl <- gsub("_", " = ", names(xm))
+  nc <- ncol(xm)
+  for (i in 1:nrow(xm)) {
+    xm$VALUE_LABELS[i] <- paste0(vl[2:nc][!is.na(xm[i, 2:nc])], collapse = " | ")
+  }
+  xm <- xm[, c("variable", "VALUE_LABELS")]
+  names(xm) <- c("VAR_NAMES", "VALUE_LABELS")
+  return(xm)
+}
+
+#' extract the missings from the values
+#'
+#' @param df_categories the OPAL categories sheet as a data frame
+#' @param ordered_variables the variables in the correct order
+#'
+#' @return the full vector of missing lists ordered by the ordered_variables
+#' @author Jörg Henke
+#'
+#' @importFrom stats setNames
+#' @importFrom data.table dcast setDT
+util_extract_missinglist <- function(df_categories, ordered_variables) {
+  df_missing <- df_categories[df_categories$missing, c("variable", "name"), drop = FALSE]
+  if (nrow(df_missing) > 0) {
+    df_missing
+
+    xm <- dcast(setDT(df_missing), variable ~ name, fill = 0)
+
+    paste0withoutNA <- function(x) {
+      paste0(x[!is.na(x)], collapse = "|")
+    }
+
+    merged <- setNames(apply(xm[, -1, drop = FALSE], 1, paste0withoutNA), nm = xm[, 1, drop = TRUE])
+
+    return(merged[ordered_variables])
+  } else {
+    return(NA_character_)
+  }
+}
+
+rename <- function(df, rnvec) {
+  if (length(names(rnvec)) == 0) {
+    stop("Need names")
+  }
+  df[, rnvec] <- df[, names(rnvec)]
+  df[, names(rnvec)] <- NULL
+  df
+}
+
+#'
+#' @author Jörg Henke
+#'
+opal2dataquieR <- function(opal_input) {
+
+  df_variables <- opal_input$variables
+  df_categories <- opal_input$categories
+
+  df_vars <- df_variables[!is.na(df_variables$index), , drop = FALSE]
+  df_vars <- util_ensure_default_label(df_vars)
+  df_categories <- util_ensure_default_label(df_categories)
+  df_vars <- rename(df_vars, c("index"       = "VARIABLE_ORDER",
+                               "name"        = "VAR_NAMES",
+                               "description" = "LONG_LABEL",
+                               "label"       = "LABEL"))
+  df_vars$DATA_TYPE <- util_dataquieR_datatypes(df_vars$valueType)
+  df_vars$valueType <- NULL
+
+  df_vars <- merge(df_vars, util_prepare_categories(df_categories = df_categories),
+                   by = "VAR_NAMES",
+                   all.x = TRUE)
+
+  df_vars$MISSING_LIST <- util_extract_missinglist(df_categories = df_categories, ordered_variables = df_vars$VAR_NAMES)
+
+  attr(df_vars, "extra_cols") <- setdiff(names(df_vars), names(dataquieR::WELL_KNOWN_META_VARIABLE_NAMES))
+  attr(df_vars, "missing_cols") <- setdiff(names(dataquieR::WELL_KNOWN_META_VARIABLE_NAMES), names(df_vars))
+  return(df_vars)
+}

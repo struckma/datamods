@@ -7,7 +7,10 @@
 \alias{import_modal}
 \title{Import from all sources}
 \usage{
-import_ui(id, from = c("env", "file", "copypaste", "googlesheets", "url"))
+import_ui(
+  id,
+  from = c("env", "file", "copypaste", "googlesheets", "url", "opalr")
+)
 
 import_server(
   id,
