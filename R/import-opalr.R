@@ -7,7 +7,7 @@
 #' @template module-import
 #'
 #' @export
-#' @name import-import-opalr-ui
+#' @name import-opalr-ui
 #'
 #' @importFrom shiny NS actionLink
 #' @importFrom shinyWidgets textInputIcon
@@ -43,7 +43,7 @@ import_opalr_ui <- function(id, title = TRUE) {
       icon = phosphoricons::ph("user"),
       width = "100%"
     ),
-    dbConnectGUI::passwordInputIcon(
+    dbConnectGUI::passwordInputIcon( # TODO: Fix Dependency
       inputId = ns("password"),
       label = i18n("Enter the Opal password:"),
       icon = phosphoricons::ph("key"),
