@@ -9,7 +9,7 @@
 \usage{
 import_ui(
   id,
-  from = c("env", "file", "copypaste", "googlesheets", "url", "opalr")
+  from = c("env", "file", "copypaste", "googlesheets", "url", "opalr", "database")
 )
 
 import_server(

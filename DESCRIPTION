@@ -45,5 +45,6 @@ Suggests:
     MASS,
     rmarkdown,
     testthat,
-    validate
+    validate,
+    dbConnectGUI
 VignetteBuilder: knitr

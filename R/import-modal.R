@@ -19,7 +19,7 @@
 #'
 #' @example examples/modal.R
 #'
-import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "url", "opalr")) {
+import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "url", "opalr", "database")) {
   ns <- NS(id)
   from <- match.arg(from, several.ok = TRUE)
 
@@ -80,7 +80,22 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
     }
   }
 
-  #database <- if("database" %in% from) tabPanel("Database", import_database_ui(ns("database")))
+  if (requireNamespace("dbConnectGUI", quietly = TRUE)) {
+    database <- if ("database" %in% from) {
+      tabPanelBody(
+        value = "database",
+        tags$br(),
+        import_database_ui(id = ns("database"), title = NULL)
+      )
+    }
+  } else if ("database" %in% from) {
+    from <- setdiff(from, "database")
+    if (length(from) == 0) {
+      stop(i18n("Please install.packages('dbConnectGUI')."))
+    } else {
+      warning(i18n("dbConnectGUI not installed, so not database import is offered, Please install.packages('dbConnectGUI')."))
+    }
+  }
 
   labsImport <- list(
     "env" = i18n("Environment"),
@@ -88,6 +103,7 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
     "copypaste" = i18n("Copy / Paste"),
     "googlesheets" = i18n("Googlesheets"),
     "opalr" = i18n("opalr"),
+    "database" = i18n("database"),
     "url" = i18n("URL")
   )
   iconsImport <- list(
@@ -96,6 +112,7 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
     "copypaste" = phosphoricons::ph("clipboard-text", title = labsImport$copypaste),
     "googlesheets" = phosphoricons::ph("cloud-arrow-down", title = labsImport$googlesheets),
     "opalr" = phosphoricons::ph("database", title = labsImport$opalr),
+    "database" = phosphoricons::ph("database", title = labsImport$database),
     "url" = phosphoricons::ph("link", title = labsImport$url)
   )
 
@@ -108,11 +125,12 @@ import_ui <- function(id, from = c("env", "file", "copypaste", "googlesheets", "
       "copypaste" = import_copypaste_ui(id = ns("copypaste")),
       "googlesheets" = import_googlesheets_ui(id = ns("googlesheets")),
       "opalr" = import_opalr_ui(id = ns("opalr")),
+      "database" = import_database_ui(id = ns("database")),
       "url" = import_url_ui(id = ns("url")),
     )
   } else {
     tabsetPanelArgs <- dropNulls(list(
-      env, file, copypaste, googlesheets, opalr, url,
+      env, file, copypaste, googlesheets, database, opalr, url,
       id = ns("tabs-import"),
       type = "hidden"
     ))
@@ -285,13 +303,18 @@ import_server <- function(id,
         btn_show_data = FALSE,
         reset = reactive(input$hidden)
       )
+      from_database <- import_database_server(
+        id = "database",
+        trigger_return = "change",
+        btn_show_data = FALSE,
+        reset = reactive(input$hidden)
+      )
       from_url <- import_url_server(
         id = "url",
         trigger_return = "change",
         btn_show_data = FALSE,
         reset = reactive(input$hidden)
       )
-      #from_database <- import_database_server("database")
 
       observeEvent(from_env$data(), {
         data_rv$data <- from_env$data()
@@ -313,13 +336,14 @@ import_server <- function(id,
         data_rv$data <- from_opalr$data()
         data_rv$name <- from_opalr$name()
       })
+      observeEvent(from_database$data(), {
+        data_rv$data <- from_database$data()
+        data_rv$name <- from_database$name()
+      })
       observeEvent(from_url$data(), {
         data_rv$data <- from_url$data()
         data_rv$name <- from_url$name()
       })
-      # observeEvent(from_database$data(), {
-      #   data_rv$data <- from_database$data()
-      # })
 
       observeEvent(data_rv$data, {
         req(data_rv$data)
