@@ -82,6 +82,11 @@ import_database_server <- function(id,
 
   trigger_return <- match.arg(trigger_return)
 
+  dbi_con <- dbConnectGUI::create_connect_dialog_SRV(id,
+                                                     callback =
+                                                       function(...) {})
+
+
   module <- function(input, output, session) {
 
     ns <- session$ns
@@ -168,7 +173,13 @@ import_database_server <- function(id,
     }, ignoreInit = TRUE)
 
     observeEvent(input$connect, {
-      connect()
+      cn <- dbi_con$get_result()
+      str(cn$get_tables())
+      str(cn$get_schemas())
+      str(cn$supportsSchemas)
+      str(cn$fetch_table("pg_catalog.pg_type"))
+      # browser()
+      # connect()
     }, ignoreInit = TRUE)
 
     observeEvent(input$see_data, {
@@ -195,11 +206,6 @@ import_database_server <- function(id,
     }
   }
 
-  dbConnectGUI::create_connect_dialog_SRV(id,
-                                          callback = function(...) {
-                                            browser() # TODO: https://stackoverflow.com/a/68594560
-                                            str(...)
-                                          })
   moduleServer(
     id = id,
     module = module
