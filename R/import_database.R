@@ -36,7 +36,7 @@ import_database_ui <- function(id, title = TRUE) {
     ),
     dbConnectGUI::create_connect_dialog_UI(id,
                                            displayCancel = FALSE,
-                                           submitLabel = "Connect..."),
+                                           displaySubmit = FALSE),
     selectInput(
       inputId = ns("schema"),
       label = "Schema",
@@ -90,15 +90,15 @@ import_database_server <- function(id,
   module <- function(input, output, session) {
 
     ns <- session$ns
-    imported_rv <- reactiveValues(data = NULL, name = NULL, ds = NULL)
+    imported_rv <- reactiveValues(data = NULL, name = NULL, cn = NULL)
     temporary_rv <- reactiveValues(data = NULL, name = NULL, status = NULL,
-                                   ds = NULL)
+                                   cn = NULL)
 
     observeEvent(reset(), {
       temporary_rv$data <- NULL
       temporary_rv$name <- NULL
       temporary_rv$status <- NULL
-      temporary_rv$ds <- NULL
+      temporary_rv$cn <- NULL
     })
 
     output$container_confirm_btn <- renderUI({
@@ -112,6 +112,24 @@ import_database_server <- function(id,
         hideUI(selector = paste0("#", ns("confirm-button")))
       }
     })
+
+    update_schemas <- function() {
+      browser()
+      choices <- setNames(list(NA),
+                          sprintf("N/A for %s", temporary_rv$cn$drv_name))
+      if (temporary_rv$cn$supportsSchemas) {
+        choices <- temporary_rv$cn$get_schemas()
+        if (length(choices) > 0) {
+          updateSelectInput(session = session,
+                            inputId = "schema",
+                            choices = choices)
+        }
+      } else {
+        updateSelectInput(session = session,
+                          inputId = "schema",
+                          choices = choices)
+      }
+    }
 
     update_tables <- function() {
       choices <- "TODO: Fille in tables"
@@ -129,7 +147,7 @@ import_database_server <- function(id,
         insert_error(mssg = i18n(attr(o, "condition")$message))
         temporary_rv$status <- "error"
         temporary_rv$data <- NULL
-        temporary_rv$ds <- NULL
+        temporary_rv$cn <- NULL
       } else {
         toggle_widget(inputId = "confirm", enable = TRUE)
         insert_alert(
@@ -156,6 +174,7 @@ import_database_server <- function(id,
           insert_error(mssg = i18n(attr(imported, "condition")$message))
           temporary_rv$status <- "error"
           temporary_rv$data <- NULL
+          temporary_rv$cn <- NULL
         } else {
           temporary_rv$status <- "success"
           temporary_rv$data <- imported
@@ -174,9 +193,10 @@ import_database_server <- function(id,
 
     observeEvent(input$connect, {
       cn <- dbi_con$get_result()
+      temporary_rv$cn <- cn
+      update_schemas()
       str(cn$get_tables())
-      str(cn$get_schemas())
-      str(cn$supportsSchemas)
+
       str(cn$fetch_table("pg_catalog.pg_type"))
       # browser()
       # connect()
@@ -184,14 +204,18 @@ import_database_server <- function(id,
 
     observeEvent(input$see_data, {
       connect()
+      browser() # TODO
       show_data(temporary_rv$data, title = i18n("Imported data"))
     })
 
     observeEvent(input$confirm, {
+      browser() # TODO
       imported_rv$data <- temporary_rv$data
     })
 
     if (identical(trigger_return, "button")) {
+      browser() # TODO
+
       return(list(
         status = reactive(temporary_rv$status),
         name = reactive(imported_rv$name),
